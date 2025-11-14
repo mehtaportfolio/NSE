@@ -1,43 +1,67 @@
-import express from "express";
-import cors from "cors";
-import fetch from "node-fetch";
+// server.js
+const express = require("express");
+const fetch = require("node-fetch"); // npm install node-fetch@2
+const cors = require("cors");
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 
-app.get("/nse", async (req, res) => {
+const PORT = process.env.PORT || 3000;
+
+// Helper to fetch NSE unofficial API
+async function fetchNSEData(symbol) {
+  const url = `https://www.nseindia.com/api/quote-equity?symbol=${encodeURIComponent(symbol)}`;
+
+  const headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": "https://www.nseindia.com/",
+    "Accept": "application/json, text/javascript, */*; q=0.01"
+  };
+
   try {
-    const symbol = req.query.symbol;
-    if (!symbol) return res.status(400).json({ error: "Missing symbol" });
+    const res = await fetch(url, { headers });
+    if (!res.ok) {
+      console.log(`⚠️ NSE HTTP ${res.status} for ${symbol}`);
+      return null;
+    }
 
-    const url = `https://www.nseindia.com/api/quote-equity?symbol=${symbol}`;
+    const data = await res.json();
+    const sector = data.industryInfo?.sector || "";
+    const industry = data.industryInfo?.industry || "";
 
-    const result = await fetch(url, {
-      headers: {
-        "user-agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-        referer: "https://www.nseindia.com/",
-      },
-    });
-
-    const data = await result.json();
-
-    const sector =
-      data?.info?.industry || data?.industryInfo?.industry || "";
-    const industry =
-      data?.metadata?.industry || data?.industryInfo?.sector || "";
-
-    res.json({
-      symbol,
-      sector,
-      industry,
-    });
+    if (!sector && !industry) return null;
+    return { symbol, sector, industry };
   } catch (err) {
-    res.status(500).json({
-      error: "Proxy error",
-      message: err.message,
-    });
+    console.log(`❌ NSE fetch error for ${symbol}:`, err.message);
+    return null;
   }
+}
+
+// POST endpoint to fetch multiple NSE tickers
+app.post("/fetch-nse", async (req, res) => {
+  const { tickers } = req.body;
+  if (!tickers || !Array.isArray(tickers)) {
+    return res.status(400).json({ error: "Please provide an array of tickers." });
+  }
+
+  const results = [];
+  for (let ticker of tickers) {
+    const symbol = ticker.replace(/\.NS$/i, "").trim(); // Remove Yahoo suffix if any
+    const data = await fetchNSEData(symbol);
+    if (data) results.push(data);
+    await new Promise(r => setTimeout(r, 500)); // small delay to prevent NSE blocking
+  }
+
+  res.json({ results });
 });
 
-app.listen(3000, () => console.log("Proxy running on port 3000"));
+// Health check
+app.get("/", (req, res) => {
+  res.send("NSE Sector/Industry Fetcher running");
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
