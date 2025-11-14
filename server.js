@@ -5,10 +5,15 @@ import fetch from "node-fetch";
 const app = express();
 app.use(cors());
 
+// ------------------------------------------------------
+// 🔵 1) NSE Proxy — Gets sector + industry from NSE API
+// ------------------------------------------------------
 app.get("/nse", async (req, res) => {
   try {
     const symbol = req.query.symbol;
-    if (!symbol) return res.status(400).json({ error: "Missing symbol" });
+    if (!symbol) {
+      return res.status(400).json({ error: "Missing symbol" });
+    }
 
     const url = `https://www.nseindia.com/api/quote-equity?symbol=${symbol}`;
 
@@ -24,20 +29,73 @@ app.get("/nse", async (req, res) => {
 
     const sector =
       data?.info?.industry || data?.industryInfo?.industry || "";
+
     const industry =
       data?.metadata?.industry || data?.industryInfo?.sector || "";
 
-    res.json({
+    return res.json({
       symbol,
       sector,
       industry,
     });
   } catch (err) {
-    res.status(500).json({
-      error: "Proxy error",
+    return res.status(500).json({
+      error: "NSE Proxy Error",
       message: err.message,
     });
   }
 });
 
-app.listen(3000, () => console.log("Proxy running on port 3000"));
+// ------------------------------------------------------
+// 🟣 2) Yahoo Finance — Sector, Industry, MarketCap
+// ------------------------------------------------------
+app.get("/yahoo", async (req, res) => {
+  try {
+    const ticker = req.query.ticker;
+    if (!ticker) {
+      return res.status(400).json({ error: "Missing ticker" });
+    }
+
+    const url =
+      `https://query1.finance.yahoo.com/v10/finance/quoteSummary/` +
+      `${ticker}?modules=summaryProfile,summaryDetail,price`;
+
+    const response = await fetch(url, {
+      headers: {
+        "user-agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+      },
+    });
+
+    const json = await response.json();
+    const result = json?.quoteSummary?.result?.[0];
+
+    const sector =
+      result?.summaryProfile?.sector || "";
+
+    const industry =
+      result?.summaryProfile?.industry || "";
+
+    const marketCap =
+      result?.summaryDetail?.marketCap?.raw ||
+      result?.price?.marketCap?.raw ||
+      0;
+
+    return res.json({
+      ticker,
+      sector,
+      industry,
+      marketCap,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      error: "Yahoo Proxy Error",
+      message: err.message,
+    });
+  }
+});
+
+// ------------------------------------------------------
+app.listen(3000, () => {
+  console.log("API Server running on port 3000 🔥");
+});
