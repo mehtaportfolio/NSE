@@ -1,13 +1,16 @@
 // server.js
-const express = require("express");
-const fetch = require("node-fetch"); // npm install node-fetch@2
-const cors = require("cors");
+import express from "express";
+import fetch from "node-fetch"; // node-fetch v3+ uses ESM by default
+import cors from "cors";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
+
+// Your existing code below remains the same
+
 
 // Helper to fetch NSE unofficial API
 async function fetchNSEData(symbol) {
