@@ -56,37 +56,51 @@ app.get("/yahoo", async (req, res) => {
       return res.status(400).json({ error: "Missing ticker" });
     }
 
-    const url =
-      `https://query1.finance.yahoo.com/v10/finance/quoteSummary/` +
-      `${ticker}?modules=summaryProfile,summaryDetail,price`;
+    // ----------------------------
+    // 1️⃣ Fetch Profile (Sector/Industry)
+    // ----------------------------
+    const profileUrl =
+      `https://query2.finance.yahoo.com/v1/finance/profile/${ticker}`;
 
-    const response = await fetch(url, {
+    const profileRes = await fetch(profileUrl, {
       headers: {
         "user-agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
       },
     });
 
-    const json = await response.json();
-    const result = json?.quoteSummary?.result?.[0];
+    const profileJson = await profileRes.json();
+    const profile = profileJson?.assetProfile || {};
 
-    const sector =
-      result?.summaryProfile?.sector || "";
+    const sector = profile?.sector || "";
+    const industry = profile?.industry || "";
 
-    const industry =
-      result?.summaryProfile?.industry || "";
+    // ----------------------------
+    // 2️⃣ Fetch Market Cap
+    // ----------------------------
+    const chartUrl =
+      `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}`;
 
-    const marketCap =
-      result?.summaryDetail?.marketCap?.raw ||
-      result?.price?.marketCap?.raw ||
-      0;
+    const chartRes = await fetch(chartUrl, {
+      headers: {
+        "user-agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+      },
+    });
 
+    const chartJson = await chartRes.json();
+    const meta = chartJson?.chart?.result?.[0]?.meta;
+
+    const marketCap = meta?.marketCap || 0;
+
+    // ----------------------------
     return res.json({
       ticker,
       sector,
       industry,
       marketCap,
     });
+
   } catch (err) {
     return res.status(500).json({
       error: "Yahoo Proxy Error",
