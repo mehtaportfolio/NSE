@@ -46,7 +46,6 @@ app.get("/nse", async (req, res) => {
   }
 });
 
-// ------------------------------------------------------
 app.get("/yahoo", async (req, res) => {
   try {
     const ticker = req.query.ticker;
@@ -62,7 +61,12 @@ app.get("/yahoo", async (req, res) => {
       },
     });
 
-    const json = await result.json();
+    // ✅ ADD DEBUG LINE HERE
+    const raw = await result.text();
+    console.log("RAW RESPONSE:", raw);
+
+    // Then parse JSON
+    const json = JSON.parse(raw);
 
     const data = json?.quoteSummary?.result?.[0];
 
@@ -70,19 +74,21 @@ app.get("/yahoo", async (req, res) => {
     const industry = data?.summaryProfile?.industry || "";
     const marketCap = data?.price?.marketCap?.raw || 0;
 
-    return res.json({
+    res.json({
       ticker,
       sector,
       industry,
       marketCap,
     });
+
   } catch (err) {
-    return res.status(500).json({
+    res.status(500).json({
       error: "Yahoo Proxy Error",
       message: err.message,
     });
   }
 });
+
 
 
 // ------------------------------------------------------
